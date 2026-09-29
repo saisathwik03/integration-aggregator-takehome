@@ -121,7 +121,7 @@ jobs:
           docker run -d \
             --name mock-oauth2-server \
             -p 8080:8080 \
-            -e SERVER_HOSTNAME=host.minikube.internal \
+            -e SERVER_HOSTNAME=0.0.0.0 \
             -e JSON_CONFIG='{
               "interactiveLogin": false,
               "tokenCallbacks": [
