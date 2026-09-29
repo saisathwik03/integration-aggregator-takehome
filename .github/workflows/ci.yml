@@ -64,10 +64,40 @@ jobs:
 
       - name: Wait for OpenBao
         run: |
-          kubectl rollout status \
-            statefulset/openbao \
+          echo "Waiting for OpenBao StatefulSet..."
+
+          for i in {1..60}; do
+            if kubectl get statefulset/openbao -n openbao >/dev/null 2>&1; then
+              echo "OpenBao StatefulSet exists."
+              break
+            fi
+
+            echo "Waiting for StatefulSet to be created... ($i/60)"
+            sleep 5
+          done
+
+          kubectl get statefulset -n openbao
+          kubectl get pods -n openbao -o wide
+
+          kubectl wait \
             --namespace openbao \
-            --timeout=180s
+            --for=condition=ready pod/openbao-0 \
+            --timeout=300s
+
+      - name: Debug OpenBao if needed
+        if: failure()
+        run: |
+          echo "=== OpenBao StatefulSets ==="
+          kubectl get statefulsets -n openbao -o wide || true
+
+          echo "=== OpenBao Pods ==="
+          kubectl get pods -n openbao -o wide || true
+
+          echo "=== OpenBao Pod Description ==="
+          kubectl describe pod/openbao-0 -n openbao || true
+
+          echo "=== OpenBao Events ==="
+          kubectl get events -n openbao --sort-by=.lastTimestamp || true
 
       - name: Enable OAuth2 secrets engine
         run: |
