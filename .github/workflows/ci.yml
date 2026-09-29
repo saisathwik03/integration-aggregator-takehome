@@ -64,9 +64,9 @@ jobs:
 
       - name: Wait for OpenBao
         run: |
-          kubectl wait \
+          kubectl rollout status \
+            statefulset/openbao \
             --namespace openbao \
-            --for=condition=ready pod/openbao-0 \
             --timeout=180s
 
       - name: Enable OAuth2 secrets engine
