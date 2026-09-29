@@ -181,11 +181,17 @@ GitHub Actions performs:
 1. Python unit tests.
 2. Minikube startup.
 3. OpenBao and OAuth plugin deployment.
-4. Helm application deployment.
-5. End-to-end OAuth/API smoke tests.
-6. k6 performance testing at three concurrent virtual users.
-7. Docker image publishing to GHCR.
-8. Helm chart publishing to GHCR.
+4. Local OIDC provider startup using `navikt/mock-oauth2-server`.
+5. Helm application deployment.
+6. End-to-end OAuth/API smoke tests.
+7. k6 performance testing at three concurrent virtual users.
+8. Docker image publishing to GHCR.
+9. Helm chart publishing to GHCR.
+
+The CI end-to-end test registers the local OIDC provider through the same
+`POST /providers` API used by other OAuth providers. The OIDC issuer is exposed
+through OpenID Connect discovery, and the test exercises the authorization-code
+flow before verifying asynchronous credential retrieval from OpenBao.
 
 The performance test measures the asynchronous token-request submission
 endpoint and reports p50, p95, throughput, and request failures.
