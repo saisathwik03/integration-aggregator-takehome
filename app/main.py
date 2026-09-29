@@ -38,6 +38,7 @@ def register_provider(
         "provider": provider.provider,
         "client_id": provider.client_id,
         "client_secret": provider.client_secret,
+        "provider_options": provider.provider_options,
     }
 
     openbao.write(

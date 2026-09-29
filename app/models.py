@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ProviderRequest(BaseModel):
@@ -6,3 +6,6 @@ class ProviderRequest(BaseModel):
     provider: str
     client_id: str
     client_secret: str
+    provider_options: dict[str, str] = Field(
+        default_factory=dict
+    )

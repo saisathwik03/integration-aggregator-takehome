@@ -5,12 +5,15 @@ set -euo pipefail
 BASE_URL="http://127.0.0.1:8000"
 
 echo "Checking application health..."
-curl --fail --silent "$BASE_URL/health"
+
+curl --fail --silent \
+  "$BASE_URL/health"
 
 echo
-echo "Registering test OAuth provider..."
 
-REGISTER_RESPONSE=$(
+echo "Registering GitHub test provider..."
+
+GITHUB_REGISTER_RESPONSE=$(
   curl --fail --silent \
     -X POST "$BASE_URL/providers" \
     -H "Content-Type: application/json" \
@@ -22,22 +25,26 @@ REGISTER_RESPONSE=$(
     }'
 )
 
-echo "$REGISTER_RESPONSE"
+echo "$GITHUB_REGISTER_RESPONSE"
 
-echo "$REGISTER_RESPONSE" | grep -q '"status":"registered"'
+echo "$GITHUB_REGISTER_RESPONSE" \
+  | grep -q '"status":"registered"'
 
-echo "Checking OAuth connect flow..."
+echo "Checking GitHub OAuth connect flow..."
 
-CONNECT_RESPONSE=$(
+GITHUB_CONNECT_RESPONSE=$(
   curl --fail --silent \
     -X POST \
     "$BASE_URL/providers/ci-provider/users/ci-user/connect"
 )
 
-echo "$CONNECT_RESPONSE"
+echo "$GITHUB_CONNECT_RESPONSE"
 
-echo "$CONNECT_RESPONSE" | grep -q '"authorization_url"'
-echo "$CONNECT_RESPONSE" | grep -q '"state"'
+echo "$GITHUB_CONNECT_RESPONSE" \
+  | grep -q '"authorization_url"'
+
+echo "$GITHUB_CONNECT_RESPONSE" \
+  | grep -q '"state"'
 
 echo "Checking invalid OAuth state..."
 
@@ -53,12 +60,70 @@ if [ "$CALLBACK_STATUS" != "400" ]; then
   exit 1
 fi
 
+echo "Registering local OIDC provider..."
+
+OIDC_REGISTER_RESPONSE=$(
+  curl --fail --silent \
+    -X POST "$BASE_URL/providers" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "name": "ci-oidc",
+      "provider": "oidc",
+      "client_id": "ci-client-id",
+      "client_secret": "ci-client-secret",
+      "provider_options": {
+        "issuer_url": "http://host.minikube.internal:8080/default"
+      }
+    }'
+)
+
+echo "$OIDC_REGISTER_RESPONSE"
+
+echo "$OIDC_REGISTER_RESPONSE" \
+  | grep -q '"status":"registered"'
+
+echo "Starting local OIDC authorization flow..."
+
+OIDC_CONNECT_RESPONSE=$(
+  curl --fail --silent \
+    -X POST \
+    "$BASE_URL/providers/ci-oidc/users/ci-user/connect"
+)
+
+echo "$OIDC_CONNECT_RESPONSE"
+
+echo "$OIDC_CONNECT_RESPONSE" \
+  | grep -q '"authorization_url"'
+
+OIDC_AUTH_URL=$(
+  echo "$OIDC_CONNECT_RESPONSE" \
+    | sed -n 's/.*"authorization_url":"\([^"]*\)".*/\1/p'
+)
+
+if [ -z "$OIDC_AUTH_URL" ]; then
+  echo "OIDC authorization URL was not returned"
+  exit 1
+fi
+
+echo "OIDC authorization URL received."
+
+echo "Running programmatic OIDC consent..."
+
+curl --fail \
+  --silent \
+  --show-error \
+  --location \
+  --output /tmp/oidc-callback-response.html \
+  "$OIDC_AUTH_URL"
+
+echo "OIDC authorization flow completed."
+
 echo "Checking asynchronous token retrieval..."
 
 TOKEN_RESPONSE=$(
   curl --fail --silent \
     -D /tmp/token-headers.txt \
-    "$BASE_URL/ci-provider/ci-user"
+    "$BASE_URL/ci-oidc/ci-user"
 )
 
 echo "$TOKEN_RESPONSE"
@@ -75,18 +140,48 @@ fi
 
 echo "Request ID: $REQUEST_ID"
 
-echo "Checking request status..."
+echo "Polling token request..."
 
-sleep 2
+for i in {1..10}; do
+  REQUEST_STATUS=$(
+    curl --fail --silent \
+      "$BASE_URL/requests/$REQUEST_ID"
+  )
 
-REQUEST_STATUS=$(
-  curl --fail --silent \
-    "$BASE_URL/requests/$REQUEST_ID"
+  echo "$REQUEST_STATUS"
+
+  if echo "$REQUEST_STATUS" | grep -q '"status":"completed"'; then
+    echo "Token retrieval completed."
+    break
+  fi
+
+  if echo "$REQUEST_STATUS" | grep -q '"status":"failed"'; then
+    echo "Token retrieval failed."
+    exit 1
+  fi
+
+  sleep 1
+done
+
+echo "$REQUEST_STATUS" \
+  | grep -q '"status":"completed"'
+
+echo "Local OIDC end-to-end flow passed."
+
+echo "Checking unknown async request..."
+
+UNKNOWN_STATUS=$(
+  curl --silent \
+    -o /tmp/unknown-request.json \
+    -w "%{http_code}" \
+    "$BASE_URL/requests/does-not-exist"
 )
 
-echo "$REQUEST_STATUS"
+if [ "$UNKNOWN_STATUS" != "404" ]; then
+  echo "Expected unknown request HTTP 404, got $UNKNOWN_STATUS"
+  exit 1
+fi
 
-echo "$REQUEST_STATUS" | grep -q '"status":"failed"'
-echo "$REQUEST_STATUS" | grep -q '"error":"Credential not found"'
+echo "Unknown request check passed."
 
 echo "E2E smoke test passed."
