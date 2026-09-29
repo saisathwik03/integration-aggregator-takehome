@@ -130,3 +130,62 @@ jobs:
           path: |
             perf/k6-summary.json
             perf/report.md
+
+  publish:
+    needs:
+      - test
+      - e2e
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE_TAG="${GITHUB_SHA}"
+
+          docker build \
+            -t "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}" \
+            -t "${REGISTRY}/${IMAGE_NAME}:latest" \
+            .
+
+          docker push "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+          docker push "${REGISTRY}/${IMAGE_NAME}:latest"
+
+      - name: Log in to GHCR for Helm
+        run: |
+          echo "${GITHUB_TOKEN}" | \
+            helm registry login ghcr.io \
+            --username "${GITHUB_ACTOR}" \
+            --password-stdin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package Helm chart
+        run: |
+          helm package deploy/integration-aggregator \
+            --version "0.1.${GITHUB_RUN_NUMBER}" \
+            --app-version "${GITHUB_SHA}"
+
+      - name: Push Helm chart to GHCR
+        run: |
+          helm push \
+            "integration-aggregator-0.1.${GITHUB_RUN_NUMBER}.tgz" \
+            "oci://ghcr.io/${GITHUB_REPOSITORY_OWNER}/helm"          
