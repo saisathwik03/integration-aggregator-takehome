@@ -76,8 +76,25 @@ jobs:
             sleep 5
           done
 
+          echo "Waiting for OpenBao pod to be created..."
+
+          for i in {1..60}; do
+            if kubectl get pod/openbao-0 -n openbao >/dev/null 2>&1; then
+              echo "OpenBao pod exists."
+              break
+            fi
+
+            echo "Waiting for openbao-0 pod... ($i/60)"
+            sleep 5
+          done
+
+          echo "OpenBao StatefulSets:"
           kubectl get statefulset -n openbao
+
+          echo "OpenBao Pods:"
           kubectl get pods -n openbao -o wide
+
+          echo "Waiting for OpenBao pod to become ready..."
 
           kubectl wait \
             --namespace openbao \
