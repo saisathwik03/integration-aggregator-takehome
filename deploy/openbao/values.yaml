@@ -1,0 +1,45 @@
+server:
+  dev:
+    enabled: true
+
+  extraArgs: "-dev-plugin-dir=/openbao/plugins"
+
+  extraInitContainers:
+    - name: oauthapp-plugin
+      image: quay.io/openbao/openbao:2.7.0
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          set -eu
+
+          cd /tmp
+
+          wget -q \
+            https://github.com/openbao/openbao-plugin-secrets-oauthapp/releases/download/v3.4.1/openbao-plugin-secrets-oauthapp-v3.4.1-linux-amd64.tar.xz \
+            -O oauthapp.tar.xz
+
+          echo "8e449c649c29ba032e42ecd85bb26be537cdbb7330873600ce08ec48dc8a8e3e  oauthapp.tar.xz" \
+            | sha256sum -c -
+
+          tar -xf oauthapp.tar.xz
+
+          mv \
+            openbao-plugin-secrets-oauthapp-v3.4.1-linux-amd64 \
+            /openbao/plugins/oauthapp
+
+          chmod +x /openbao/plugins/oauthapp
+
+          ls -lh /openbao/plugins/oauthapp
+
+      volumeMounts:
+        - name: plugins
+          mountPath: /openbao/plugins
+
+  volumes:
+    - name: plugins
+      emptyDir: {}
+
+  volumeMounts:
+    - name: plugins
+      mountPath: /openbao/plugins
+      readOnly: true

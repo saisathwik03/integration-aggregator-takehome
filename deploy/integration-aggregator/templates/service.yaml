@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "integration-aggregator.fullname" . }}
+  labels:
+    app: {{ include "integration-aggregator.name" . }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app: {{ include "integration-aggregator.name" . }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
