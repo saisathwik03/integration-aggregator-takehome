@@ -12,7 +12,7 @@ OPENBAO_VALUES=deploy/openbao/values.yaml
 OPENBAO_TOKEN?=root
 
 
-.PHONY: up down test build load deploy
+.PHONY: up down test build load deploy e2e
 
 up:
 	@echo "Starting Minikube..."
@@ -83,3 +83,6 @@ deploy:
 	helm upgrade --install $(APP_RELEASE) \
 		$(APP_CHART) \
 		--set-string openbao.token="$(OPENBAO_TOKEN)"
+
+e2e:
+	./scripts/e2e.sh
