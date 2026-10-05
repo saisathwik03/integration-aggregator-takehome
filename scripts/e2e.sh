@@ -113,6 +113,8 @@ curl --fail \
   --silent \
   --show-error \
   --location \
+  --data-urlencode "username=ci-user" \
+  --data-urlencode 'claims={}' \
   --output /tmp/oidc-callback-response.html \
   "$OIDC_AUTH_URL"
 
